@@ -1,4 +1,5 @@
 import * as store from "./store.js";
+import * as sync from "./sync.js";
 import * as M from "./model.js";
 import * as A from "./actions.js";
 import { $, $$, esc } from "./util.js";
@@ -47,6 +48,12 @@ function runChip(compact) {
     (compact ? "" : "<span class=\"rt\">" + esc(r.title) + "</span>") + '<b data-elapsed="' + r.id + '">' + M.dur(M.actualMin(r)) + "</b></a>";
 }
 const catHue = id => { const c = store.get().cats[id]; return c && c.hue != null ? c.hue : hue(id); };
+function syncDot(compact) {
+  const st = sync.status;
+  if (!st.user && !st.error) return "";
+  const cls = st.error ? "err" : "on", label = st.error ? "Sync issue" : st.syncing ? "Syncing" : "Synced";
+  return '<a class="sync ' + cls + (compact ? " compact" : "") + '" href="#/settings" title="' + esc(st.error || label) + '"><span class="dot"></span>' + (compact ? "" : "<span>" + label + "</span>") + "</a>";
+}
 function themeBtn() {
   const t = getTheme();
   return '<button class="iconbtn" type="button" data-theme-cycle title="Theme: ' + t + '" aria-label="Change theme">' + icon(t === "light" ? "sun" : t === "dark" ? "moon" : "system", 17) + "</button>";
@@ -60,9 +67,9 @@ function drawChrome(active) {
     '<button class="search" type="button" data-palette>' + icon("search", 15) + "<span>Search or jump to…</span><kbd>" + modKey + " K</kbd></button>" +
     '<nav class="snav">' + TABS.map(([k, label, ic]) => '<a href="#/' + k + '"' + (k === active ? ' class="on" aria-current="page"' : "") + ">" + (k === active ? '<span class="snav-ind"></span>' : "") + icon(ic, 18) + "<span>" + label + "</span>" + n(k) + "</a>").join("") + "</nav>" +
     runChip(false) +
-    '<div class="side-foot"><div class="row between"><a class="btn sm ghost" href="#/settings">' + icon("gear", 15) + "Settings</a>" + themeBtn() + "</div></div>";
+    '<div class="side-foot"><div class="row between"><a class="btn sm ghost" href="#/settings">' + icon("gear", 15) + "Settings</a>" + '<div class="row" style="gap:4px">' + syncDot(false) + themeBtn() + "</div></div></div>";
   $("#top").innerHTML = '<a class="brand sm" href="#/today"><span class="logo">' + icon("sparkle", 15) + "</span><b>Atria</b></a>" +
-    '<div class="row" style="gap:2px">' + runChip(true) + '<button class="iconbtn" type="button" data-palette aria-label="Search">' + icon("search", 18) + '</button><a class="iconbtn" href="#/settings" aria-label="Settings">' + icon("gear", 18) + "</a></div>";
+    '<div class="row" style="gap:2px">' + runChip(true) + syncDot(true) + '<button class="iconbtn" type="button" data-palette aria-label="Search">' + icon("search", 18) + '</button><a class="iconbtn" href="#/settings" aria-label="Settings">' + icon("gear", 18) + "</a></div>";
   drawDock(active, b);
 }
 /* The dock is built once and only updated, so its pill glides between tabs with a plain CSS transition. */
@@ -196,9 +203,10 @@ function boot() {
   syncThemeColor();
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", syncThemeColor);
   store.subscribe(why => {
-    if (why === "change" || why === "silent") refreshChrome();
-    else render();
+    if (why === "change" || why === "silent") { refreshChrome(); sync.scheduleSync(); }
+    else { if (why !== "remote") sync.scheduleSync(); render(); }
   });
+  sync.onStatus(refreshChrome);
   document.addEventListener("click", e => {
     if (e.target.closest("[data-palette]")) openPalette();
     else if (e.target.closest("[data-quick]")) quickAdd(ctx(), { day: route().parts[0] === "day" ? route().parts[1] : route().parts[0] === "inbox" ? null : M.todayISO() });
@@ -221,6 +229,7 @@ function boot() {
   setInterval(() => { const m = Math.floor(Date.now() / 60000); if (m !== lastMinute) { lastMinute = m; minuteRefresh(); } }, 5000);
   lastMinute = Math.floor(Date.now() / 60000);
   render();
+  sync.autoStart();
   if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
 }
 boot();
