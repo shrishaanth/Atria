@@ -1,0 +1,20 @@
+{
+  "name": "Atria",
+  "short_name": "Atria",
+  "description": "Plan your day honestly: time-blocking, timers that learn how long things really take, and repeating tasks.",
+  "start_url": "./#/today",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0a0a0c",
+  "theme_color": "#6d5ef7",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Today", "url": "./#/today" },
+    { "name": "Week", "url": "./#/week" },
+    { "name": "Inbox", "url": "./#/inbox" }
+  ]
+}
