@@ -3,6 +3,8 @@ import * as M from "../model.js";
 import { esc, $, $$ } from "../util.js";
 import { icon, hue, getTheme, setTheme } from "../ui.js";
 import { choose } from "../sheets.js";
+import * as sync from "../sync.js";
+import { ago } from "../util.js";
 
 export function render(el, r, ctx) {
   const draw = () => {
@@ -19,7 +21,17 @@ export function render(el, r, ctx) {
       '</div><button class="btn sm" id="addcat" style="margin-top:10px">' + icon("plus", 14) + "Add category</button></div>";
     h += '<div class="card"><div class="card-h">' + icon("sun", 18) + '<b>Appearance</b></div><div class="chips" id="themes" style="margin-top:10px">' +
       [["system", "System", "system"], ["light", "Light", "sun"], ["dark", "Dark", "moon"]].map(([k, l, ic]) => '<button class="chip' + (t === k ? " on" : "") + '" data-t="' + k + '">' + icon(ic, 14) + l + "</button>").join("") + "</div></div>";
-    h += '<div class="card"><div class="card-h">' + icon("sync", 18) + '<b>Sync between devices</b></div><p class="small muted" style="margin:6px 0 0">Not set up yet. For now everything is saved in this browser only &mdash; use Backup to move it between devices.</p></div>';
+    const ss = sync.status;
+    h += '<div class="card"><div class="card-h">' + icon("sync", 18) + '<b>Sync between devices</b></div>';
+    if (ss.user) {
+      h += '<div class="row" style="margin:12px 0">' + (ss.user.photo ? '<img class="avatar" src="' + esc(ss.user.photo) + '" referrerpolicy="no-referrer" alt="">' : "") + "<span>Signed in as <b>" + esc(ss.user.name) + "</b></span></div>" +
+        '<p class="small muted">' + (ss.syncing ? "Syncing…" : ss.last ? "Last synced " + ago(ss.last) : "Not synced yet") + ". Changes sync automatically between every device you sign in on.</p>" +
+        '<div class="row"><button class="btn primary sm" id="syncnow">' + icon("sync", 14) + 'Sync now</button><button class="btn sm" id="signout">Sign out</button></div>';
+    } else {
+      h += '<p class="small muted" style="margin:6px 0 12px">Everything is saved in this browser. Sign in with Google to keep your phone and laptop in sync and backed up.</p><button class="btn primary" id="signin">Sign in with Google</button>';
+    }
+    if (ss.error) h += '<p class="small" style="color:var(--bad);margin-top:10px">' + esc(ss.error) + "</p>";
+    h += "</div>";
     h += '<div class="card"><div class="card-h">' + icon("archive", 18) + '<b>Backup</b></div><p class="small muted" style="margin:6px 0 12px">Export everything to a file, or import one (it merges with what you have).</p><div class="row"><button class="btn sm" id="exp">Export</button><label class="btn sm" style="cursor:pointer">Import<input type="file" id="imp" accept="application/json" hidden></label></div></div>';
     h += '<div class="card danger"><div class="card-h">' + icon("alert", 18) + '<b>Reset</b></div><p class="small muted" style="margin:6px 0 12px">Erase all tasks, repeating tasks and history on this device.</p><button class="btn sm danger" id="reset">Erase everything</button></div>';
     el.innerHTML = h;
@@ -59,6 +71,8 @@ export function render(el, r, ctx) {
       const i = el.querySelector('[data-label="' + id + '"]'); if (i) { i.focus(); i.select(); }
     };
     $$("#themes .chip", el).forEach(c => c.onclick = () => { setTheme(c.dataset.t); setTimeout(() => { draw(); ctx.refreshChrome(); }, 20); });
+    const on = (id, fn) => { const x = $("#" + id, el); if (x) x.onclick = fn; };
+    on("signin", () => sync.signIn()); on("signout", () => sync.signOut()); on("syncnow", () => sync.syncNow());
     $("#exp", el).onclick = () => {
       const a = document.createElement("a");
       a.href = URL.createObjectURL(new Blob([store.exportJSON()], { type: "application/json" }));
@@ -74,4 +88,5 @@ export function render(el, r, ctx) {
     };
   };
   draw();
+  const off = sync.onStatus(() => { if (el.isConnected && location.hash.startsWith("#/settings")) draw(); else off(); });
 }
