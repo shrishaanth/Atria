@@ -1,7 +1,7 @@
 /* Offline support. Network first (so a deploy shows up right away), falling back to the last cached copy when
    there's no connection. Your tasks live in localStorage, so the app itself is all that needs caching.
    Bump VERSION with the ?v= numbers in index.html on every deploy. */
-const VERSION = "atria-v5";
+const VERSION = "atria-v6";
 
 self.addEventListener("install", e => { self.skipWaiting(); });
 self.addEventListener("activate", e => {
