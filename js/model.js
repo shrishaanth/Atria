@@ -149,16 +149,30 @@ export function windowOf(settings) {
   const st = settings || {};
   return { start: hm(st.dayStart || "07:00"), noon: hm(st.noon || "12:00"), eve: hm(st.evening || "17:00"), end: hm(st.dayEnd || "23:00") };
 }
+/* A task's part can be one part ("morning") or a span of adjacent parts ("morning-afternoon"),
+   for work that runs from one part of the day into the next. */
+export const PART_IDS = ["morning", "afternoon", "evening"];
+export const spanOf = part => (part ? String(part).split("-").filter(x => PART_IDS.includes(x)) : []);
+export const isSpan = part => spanOf(part).length > 1;
+export function makeSpan(ids) {                                 // any set of parts -> the contiguous span covering them
+  const ix = ids.map(x => PART_IDS.indexOf(x)).filter(i => i >= 0);
+  if (!ix.length) return null;
+  const a = Math.min(...ix), b = Math.max(...ix);
+  return a === b ? PART_IDS[a] : PART_IDS[a] + "-" + PART_IDS[b];
+}
+export const partLabel = part => spanOf(part).map(x => x[0].toUpperCase() + x.slice(1)).join(" – ") || "Anytime";
 export function partRange(settings, part) {
-  const w = windowOf(settings);
-  return part === "morning" ? [w.start, w.noon] : part === "afternoon" ? [w.noon, w.eve] : part === "evening" ? [w.eve, w.end] : [w.start, w.end];
+  const w = windowOf(settings), one = p => (p === "morning" ? [w.start, w.noon] : p === "afternoon" ? [w.noon, w.eve] : [w.eve, w.end]);
+  const sp = spanOf(part);
+  if (!sp.length) return [w.start, w.end];
+  return [one(sp[0])[0], one(sp[sp.length - 1])[1]];
 }
 export function partAt(settings, min) {
   const w = windowOf(settings);
   return min < w.noon ? "morning" : min < w.eve ? "afternoon" : "evening";
 }
 /* Which list section a task belongs to: a fixed time wins, then its part of day, else "anytime". */
-export const sectionOf = (task, settings) => (task.at ? partAt(settings, hm(task.at)) : task.part || "anytime");
+export const sectionOf = (task, settings) => (task.at ? partAt(settings, hm(task.at)) : spanOf(task.part)[0] || "anytime");
 
 /* Time still free today (or on a future day), after keeping the buffer aside. */
 export function capacity(s, date, now = Date.now()) {
@@ -218,11 +232,11 @@ export function layoutDay(s, date, now = Date.now()) {
   flex.sort((x, y) => order[sectionOf(x[0], s.settings)] - order[sectionOf(y[0], s.settings)] || (x[0].order || 0) - (y[0].order || 0));
   for (const [t, done] of flex) {
     const sec = sectionOf(t, s.settings);
-    let from = sec === "anytime" ? w.start : partRange(s.settings, sec)[0];
+    let from = sec === "anytime" ? w.start : partRange(s.settings, t.part)[0];
     if (nowMin != null && !done) from = Math.max(from, Math.ceil(nowMin / 5) * 5);
     const len = done ? (actualMin(t, now) || t.est || DEFAULT_EST) : remaining(t, now);
     const b = put(t, fits(from, len), len, done ? "done" : "plan");
-    if (sec !== "anytime" && b.end > partRange(s.settings, sec)[1]) b.spill = true;
+    if (sec !== "anytime" && b.end > partRange(s.settings, t.part)[1]) b.spill = true;
   }
   return { blocks: blocks.sort((a, b) => a.start - b.start), nowMin, win: w };
 }
@@ -288,7 +302,10 @@ export function parseQuick(text, s, today) {
   if (!out.at) take(/\s(?:at\s+|@)?([01]?\d|2[0-3]):([0-5]\d)(?=\s)/i, m => { out.at = pad(+m[1]) + ":" + m[2]; });
   if (!out.at) take(/\s(?:at\s+|@)(\d{1,2})(?=\s)/i, m => { const h = +m[1]; out.at = pad(h < 7 ? h + 12 : h) + ":00"; });
   // part of day
-  take(/\s(morning|afternoon|evening|tonight|night)(?=\s)/i, m => { const p = m[1].toLowerCase(); out.part = p === "tonight" || p === "night" ? "evening" : p; });
+  const P = s2 => (s2 === "tonight" || s2 === "night" ? "evening" : s2);
+  take(/\s(?:all\s*day|whole\s*day)(?=\s)/i, () => { out.part = "morning-evening"; });
+  take(/\s(morning|afternoon|evening|tonight|night)\s*(?:to|-|–|through|till|until|into)\s*(morning|afternoon|evening|tonight|night)(?=\s)/i, m => { out.part = makeSpan([P(m[1].toLowerCase()), P(m[2].toLowerCase())]); });
+  if (!out.part) take(/\s(morning|afternoon|evening|tonight|night)(?=\s)/i, m => { out.part = P(m[1].toLowerCase()); });
   // day
   take(/\s(?:in\s*)?(inbox|someday|later)(?=\s)/i, () => { out.day = null; });
   take(/\s(today|tod)(?=\s)/i, () => { out.day = today; });

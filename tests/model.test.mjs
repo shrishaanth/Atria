@@ -106,5 +106,20 @@ eq("dur", [M.dur(45), M.dur(60), M.dur(95)], ["45m", "1h", "1h 35m"]);
 eq("clock", [M.clock(420), M.clock(870), M.clock(0)], ["7 am", "2:30 pm", "12 am"]);
 eq("no :60 when rounding", [M.clock(779.7), M.toHM(779.7)], ["1 pm", "13:00"]);
 
+
+/* ---- tasks spanning parts of the day */
+eq("span morning to afternoon", p("project 5h morning to afternoon")[4], "morning-afternoon");
+eq("span all day", p("hackathon 8h all day")[4], "morning-evening");
+eq("span normalises", M.makeSpan(["evening", "morning"]), "morning-evening");
+eq("span range", M.partRange(M.emptyState().settings, "morning-afternoon").map(M.toHM), ["07:00", "17:00"]);
+eq("span label", M.partLabel("morning-afternoon"), "Morning – Afternoon");
+const s5 = M.emptyState(), n5 = at("2026-09-27", 6, 0);
+s5.tasks.big = M.makeTask({ id: "big", title: "Big", est: 300, day: "2026-09-27", part: "morning-afternoon" });
+s5.tasks.one = M.makeTask({ id: "one", title: "One", est: 300, day: "2026-09-27", part: "morning" });
+const l5 = Object.fromEntries(M.layoutDay(s5, "2026-09-27", n5).blocks.map(b => [b.task.id, !!b.spill]));
+eq("5h spanning task does not spill", l5.big, false);
+eq("5h morning-only task spills", l5.one, true);
+eq("span listed under its first part", M.sectionOf(s5.tasks.big, s5.settings), "morning");
+
 console.log(fail ? "\n" + fail + " FAILED, " + pass + " passed" : "all " + pass + " tests passed");
 process.exit(fail ? 1 : 0);
