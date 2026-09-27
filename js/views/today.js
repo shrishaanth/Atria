@@ -36,7 +36,7 @@ export function render(el, r, ctx) {
   if (!past) {
     const frac = load.cap ? Math.min(1, load.need / load.cap) : load.need ? 1 : 0;
     h += '<section class="daycard rise d1' + (load.over > 0 ? " full" : "") + '">' + ring(frac, { size: 76, stroke: 8, label: Math.round(frac * 100) + "%", sub: "full" }) +
-      '<div class="dstats"><div><b>' + M.dur(load.need) + "</b><span>left to do</span></div><div><b>" + M.dur(load.cap) + "</b><span>" + (isToday ? "time left" : "available") + "</span></div>" +
+      '<div class="dstats"><div><b>' + M.dur(load.need) + "</b><span>left to do</span></div><div><b>" + M.dur(load.cap) + "</b><span>" + (isToday ? "time left" : "available") + " · keeping " + M.dur(load.buffer) + " spare</span></div>" +
       "<div><b>" + load.done + "<small>/" + load.total + "</small></b><span>done</span></div><div><b>" + M.dur(load.spent) + "</b><span>tracked</span></div></div></section>";
   }
 
@@ -64,6 +64,8 @@ export function render(el, r, ctx) {
     h += '<div class="banner warn">' + icon("alert", 16) + "<span><b>This day is " + M.dur(load.over) + " over.</b> " + M.dur(load.need) + " of work, " + M.dur(load.cap) + ' of time.</span><button class="btn sm" data-resolve>Sort it out</button></div>';
   } else if (load.over > 0) {
     h += '<p class="small muted keepnote">' + icon("check", 13) + " Running " + M.dur(load.over) + " over — you chose to keep everything.</p>";
+  } else if (load.tight > 0) {
+    h += '<p class="small muted keepnote">' + icon("clock", 13) + " It fits, but uses " + M.dur(load.tight) + " of the " + M.dur(load.buffer) + " you like to keep spare.</p>";
   }
 
   /* ---- list + timeline */
