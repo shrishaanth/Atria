@@ -174,13 +174,12 @@ export function partAt(settings, min) {
 /* Which list section a task belongs to: a fixed time wins, then its part of day, else "anytime". */
 export const sectionOf = (task, settings) => (task.at ? partAt(settings, hm(task.at)) : spanOf(task.part)[0] || "anytime");
 
-/* Time still free today (or on a future day), after keeping the buffer aside. */
+/* Real time still free today (or on a future day) inside your day's hours. */
 export function capacity(s, date, now = Date.now()) {
   const w = windowOf(s.settings), today = todayISO(now);
   if (date < today) return 0;
   const from = date === today ? Math.max(w.start, minOfDay(now)) : w.start;
-  const free = Math.max(0, w.end - from);
-  return free * (1 - (s.settings.buffer ?? 15) / 100);
+  return Math.max(0, w.end - from);
 }
 export function partCapacity(s, date, part, now = Date.now()) {
   const [a, b] = partRange(s.settings, part), today = todayISO(now);
@@ -189,14 +188,19 @@ export function partCapacity(s, date, part, now = Date.now()) {
   return Math.max(0, b - from);
 }
 
-/* Work still to do on a day vs time left for it. over > 0 means the day no longer fits. */
+/* Work still to do on a day vs the real time left for it.
+   over   > 0: the work doesn't fit in the time that's actually left (the day really doesn't fit).
+   tight  > 0: it fits, but eats this much of the buffer you like to keep free (a heads-up, not an alarm). */
 export function dayLoad(s, date, now = Date.now()) {
   const list = tasksOn(s, date);
   const need = list.reduce((a, t) => a + remaining(t, now), 0);
   const planned = list.reduce((a, t) => a + (t.est || DEFAULT_EST), 0);
   const spent = list.reduce((a, t) => a + actualMin(t, now), 0);
-  const cap = capacity(s, date, now);
-  return { need, planned, spent, cap, over: date >= todayISO(now) ? Math.max(0, need - cap) : 0, done: list.filter(t => t.done).length, total: list.length };
+  const cap = capacity(s, date, now), buffer = cap * (s.settings.buffer ?? 15) / 100;
+  const live = date >= todayISO(now);
+  const over = live ? Math.max(0, need - cap) : 0;
+  const tight = live && !over ? Math.max(0, need - (cap - buffer)) : 0;
+  return { need, planned, spent, cap, buffer, over, tight, done: list.filter(t => t.done).length, total: list.length };
 }
 
 /* Where each task sits on the day's timeline. Fixed-time tasks sit at their time; finished or running tasks sit

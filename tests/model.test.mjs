@@ -53,16 +53,20 @@ eq("rule stats", M.ruleStats(s, rule, today, 30), { due: 3, done: 2 });
 
 /* ---- day capacity and the "doesn't fit" check */
 const s2 = M.emptyState();                       // 07:00-23:00, 15% buffer
-const now = at(today, 20, 0);                    // 8 pm: 3h left, 2h33m after buffer
+const now = at(today, 20, 0);                    // 8 pm: 3h left (27m of it is the 15% buffer)
 s2.tasks.a = M.makeTask({ id: "a", title: "A", est: 60, day: today });
 s2.tasks.b = M.makeTask({ id: "b", title: "B", est: 90, day: today });
 let L = M.dayLoad(s2, today, now);
-eq("capacity after buffer", Math.round(L.cap), 153);
-eq("fits", L.over, 0);
+eq("real time left", Math.round(L.cap), 180);
+eq("buffer", Math.round(L.buffer), 27);
+eq("fits, no buffer used", [L.over, L.tight], [0, 0]);
 s2.tasks.c = M.makeTask({ id: "c", title: "C", est: 45, day: today });
 L = M.dayLoad(s2, today, now);
-eq("over by 42m", Math.round(L.over), 42);
-eq("future day capacity", Math.round(M.dayLoad(s2, "2026-09-27", now).cap), Math.round(16 * 60 * 0.85));
+eq("really over by 15m (195m of work, 180m left)", [Math.round(L.over), Math.round(L.tight)], [15, 0]);
+eq("future day capacity", Math.round(M.dayLoad(s2, "2026-09-27", now).cap), 16 * 60);
+s2.tasks.c.est = 20; L = M.dayLoad(s2, today, now);
+eq("tight: fits real time, uses buffer", [L.over, Math.round(L.tight)], [0, 17]);
+s2.tasks.c.est = 45;
 eq("past day never over", M.dayLoad(s2, "2026-09-25", now).over, 0);
 
 /* ---- remaining / overrun: tracked 70m on a 60m task */
