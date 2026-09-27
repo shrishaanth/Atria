@@ -675,3 +675,4 @@ b.over,.over{color:var(--bad)}
 .catedit input[type=range]{accent-color:var(--tc)}
 @media (max-width:520px){.catedit{grid-template-columns:auto 1fr auto}.catedit input[type=range]{grid-column:2/4;grid-row:2}}
 .whenhint{margin:8px 2px 0}
+.wkd-l.tight{color:var(--warn)}

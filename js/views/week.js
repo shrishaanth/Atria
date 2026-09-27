@@ -25,10 +25,10 @@ export function render(el, r, ctx) {
   h += '<div class="wk stagger">' + days.map((d, i) => {
     const l = loads[i], past = d < today, list = M.tasksOn(s, d).sort((a, b) => Number(a.done) - Number(b.done) || (a.at ? M.hm(a.at) : 1e4) - (b.at ? M.hm(b.at) : 1e4) || (a.order || 0) - (b.order || 0));
     const frac = past ? (l.total ? l.done / l.total : 0) : l.cap ? Math.min(1, l.need / l.cap) : l.need ? 1 : 0;
-    const full = !past && l.over > 0;
+    const full = !past && l.over > 0, tight = !past && !full && l.tight > 0;
     return '<div class="wkd' + (d === today ? " now" : "") + (past ? " past" : "") + '" data-day="' + d + '"><a class="wkd-h" href="' + (d === today ? "#/today" : "#/day/" + d) + '"><b>' + M.WD[M.weekday(d)] + "</b><span>" + (+d.slice(8)) + "</span></a>" +
       '<div class="bar' + (full ? " bad" : past ? " good" : "") + '"><i style="width:' + Math.round(frac * 100) + '%"></i></div>' +
-      '<small class="wkd-l' + (full ? " over" : "") + '">' + (past ? l.done + "/" + l.total + " done" : l.total ? M.dur(l.need) + (full ? " · " + M.dur(l.over) + " over" : " of " + M.dur(l.cap)) : "free") + "</small>" +
+      '<small class="wkd-l' + (full ? " over" : tight ? " tight" : "") + '">' + (past ? l.done + "/" + l.total + " done" : l.total ? M.dur(l.need) + (full ? " · " + M.dur(l.over) + " over" : " of " + M.dur(l.cap)) : "free") + "</small>" +
       '<div class="wkd-list">' + list.map(t => '<div class="wchip hued' + (t.done ? " done" : "") + (M.isRunning(t) ? " running" : "") + '" draggable="true" data-id="' + t.id + '" style="--h:' + catHue(s, t.cat) + '"><b>' + esc(t.title) + "</b><small>" + (t.at ? M.clock(M.hm(t.at)) + " · " : t.part ? M.partLabel(t.part) + " · " : "") + M.dur(t.est || M.DEFAULT_EST) + (t.rule ? " · " + icon("repeat", 10) : "") + "</small></div>").join("") + "</div>" +
       (past ? "" : '<button class="wkd-add" data-add="' + d + '">' + icon("plus", 14) + "Add</button>") + "</div>";
   }).join("") + "</div>";
