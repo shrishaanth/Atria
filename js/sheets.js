@@ -247,7 +247,7 @@ export function resolveDay(ctx, date, culpritId = null) {
     .sort((a, b) => M.remaining(b, now) - M.remaining(a, now));
   const fixes = t => M.remaining(t, now) >= load.over;
   const html = '<div class="modal-h"><span class="modal-ic warn">' + icon("alert", 18) + '</span><div><h3>' + (date === M.todayISO(now) ? "Today" : M.dayLabel(date, M.todayISO(now))) + " no longer fits</h3>" +
-    '<p class="small muted"><b>' + M.dur(load.need) + "</b> of work left, <b>" + M.dur(load.cap) + "</b> of time left (after your buffer) — <b class=\"over\">" + M.dur(load.over) + " over</b>. What should give?</p></div></div>" +
+    '<p class="small muted"><b>' + M.dur(load.need) + "</b> of work left, <b>" + M.dur(load.cap) + "</b> of time left — <b class=\"over\">" + M.dur(load.over) + " over</b>. What should give?</p></div></div>" +
     '<div class="fixes">' +
     (culpritOk ? '<button class="fix" data-move="' + culprit.id + '"><span class="fix-n">1</span><span><b>Push “' + esc(culprit.title) + '” to tomorrow</b><small>The task that ran long · ' + M.dur(M.remaining(culprit, now)) + " left</small></span>" + icon("tomorrow", 16) + "</button>" : "") +
     (later.length ? '<div class="fix col"><span class="fix-n">' + (culpritOk ? 2 : 1) + '</span><div><b>Push a later task to tomorrow</b><div class="fix-list">' +
