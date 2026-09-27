@@ -42,7 +42,16 @@ export const catChip = (s, id) => {
 };
 
 /* ---------------------------------------------------------------- the task editor */
-const EST = [15, 30, 45, 60, 90, 120];
+const EST = [15, 30, 45, 60, 90, 120, 180, 240];
+/* "150", "2.5h", "3h 30m", "3h30", "45m" -> minutes (null if unreadable) */
+export function parseLen(v) {
+  const t = String(v || "").trim().toLowerCase().replace(/\s+/g, "");
+  let m;
+  if ((m = /^(\d+(?:\.\d+)?)$/.exec(t))) return Math.round(+m[1]);
+  if ((m = /^(\d+(?:\.\d+)?)h(?:rs?|ours?)?(?:(\d+)m?(?:in(?:ute)?s?)?)?$/.exec(t))) return Math.round(+m[1] * 60 + +(m[2] || 0));
+  if ((m = /^(\d+)m(?:in(?:ute)?s?)?$/.exec(t))) return +m[1];
+  return null;
+}
 const REPEATS = [["none", "Doesn't repeat"], ["daily", "Every day"], ["weekdays", "Weekdays"], ["custom", "Custom days"]];
 
 /* opts: { task } to edit, or { rule } to edit a repeating task's rule, or { defaults } for a new task */
@@ -76,7 +85,7 @@ export function openTask(ctx, opts = {}) {
       '<input class="tinput" id="f-title" placeholder="What needs doing?" value="' + esc(f.title) + '" autocomplete="off">' +
       '<label class="field-l">Category</label><div class="chips" id="f-cat">' + cats.map(c => '<button class="chip cat hued' + (c.id === f.cat ? " on" : "") + '" data-v="' + c.id + '" style="--h:' + (c.hue ?? hue(c.id)) + '"><i></i>' + esc(c.label) + "</button>").join("") + "</div>" +
       '<label class="field-l">How long</label><div class="chips" id="f-est">' + EST.map(m => '<button class="chip' + (m === f.est ? " on" : "") + '" data-v="' + m + '">' + M.dur(m) + "</button>").join("") +
-      '<label class="chip num"><input type="number" min="5" step="5" id="f-estn" value="' + (EST.includes(f.est) ? "" : f.est) + '" placeholder="min"></label></div>' +
+      '<label class="chip num"><input type="text" inputmode="text" id="f-estn" value="' + (EST.includes(f.est) ? "" : M.dur(f.est)) + '" placeholder="e.g. 5h"></label></div>' +
       (sug ? '<div class="hint">' + icon("clock", 14) + "<span>You usually take <b>" + sug.f.toFixed(1) + "×</b> as long on " + esc((s.cats[f.cat] || {}).label || f.cat) + " (" + sug.n + " tasks). " + M.dur(f.est) + " → <b>" + M.dur(sug.est) + '</b>?</span><button class="linkbtn" id="f-sug">Use ' + M.dur(sug.est) + "</button></div>" : "") +
       (ruleMode ? "" : '<label class="field-l">Day</label><div class="chips" id="f-day">' +
         [[today, "Today"], [M.addDays(today, 1), "Tomorrow"], ["", "Inbox"]].map(([v, l]) => '<button class="chip' + ((f.day || "") === v ? " on" : "") + '" data-v="' + v + '">' + l + "</button>").join("") +
@@ -104,7 +113,7 @@ export function openTask(ctx, opts = {}) {
     $$("[data-close]", box).forEach(b => b.onclick = m.close);
     $$("#f-cat [data-v]", box).forEach(b => b.onclick = () => { f.cat = b.dataset.v; redraw(); });
     $$("#f-est [data-v]", box).forEach(b => b.onclick = () => { f.est = +b.dataset.v; redraw(); });
-    const en = $("#f-estn", box); if (en) en.onchange = () => { if (+en.value > 0) { f.est = Math.round(+en.value); redraw(); } };
+    const en = $("#f-estn", box); if (en) en.onchange = () => { const v = parseLen(en.value); if (v > 0 && v <= 24 * 60) { f.est = v; redraw(); } else if (en.value.trim()) ctx.toast("Couldn’t read that length — try 5h, 2.5h or 3h 30m."); };
     const sg = $("#f-sug", box); if (sg) sg.onclick = () => { f.est = M.suggest(s, f.cat, f.est, fs).est; redraw(); };
     $$("#f-day [data-v]", box).forEach(b => b.onclick = () => { f.day = b.dataset.v || null; redraw(); });
     const dt = $("#f-date", box); if (dt) dt.onchange = () => { f.day = dt.value || null; redraw(); };
