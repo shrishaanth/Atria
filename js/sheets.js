@@ -90,7 +90,11 @@ export function openTask(ctx, opts = {}) {
       (ruleMode ? "" : '<label class="field-l">Day</label><div class="chips" id="f-day">' +
         [[today, "Today"], [M.addDays(today, 1), "Tomorrow"], ["", "Inbox"]].map(([v, l]) => '<button class="chip' + ((f.day || "") === v ? " on" : "") + '" data-v="' + v + '">' + l + "</button>").join("") +
         '<label class="chip num"><input type="date" id="f-date" value="' + esc(f.day || "") + '"></label></div>') +
-      '<label class="field-l">When</label><div class="seg mini" id="f-when">' + [["anytime", "Anytime"], ["morning", "Morning"], ["afternoon", "Afternoon"], ["evening", "Evening"], ["at", "At a time"]].map(([v, l]) => '<button class="' + (when() === v ? "on" : "") + '" data-v="' + v + '">' + l + "</button>").join("") + "</div>" +
+      '<label class="field-l">When</label><div class="seg mini" id="f-when">' + [["anytime", "Anytime"], ["morning", "Morning"], ["afternoon", "Afternoon"], ["evening", "Evening"], ["at", "At a time"]].map(([v, l]) => {
+        const on = v === "at" ? f.at != null : v === "anytime" ? f.at == null && !f.part : f.at == null && M.spanOf(f.part).includes(v);
+        return '<button class="' + (on ? "on" : "") + '" data-v="' + v + '">' + l + "</button>";
+      }).join("") + "</div>" +
+      (f.at == null && f.part ? '<p class="small muted whenhint">' + (M.isSpan(f.part) ? "Runs across " + esc(M.partLabel(f.part)) + ". Tap an end to shorten it." : "Tap another part to let it run on into that part too.") + "</p>" : "") +
       (f.at != null ? '<input class="input" type="time" id="f-at" value="' + esc(f.at || "09:00") + '" step="300">' : "") +
       '<label class="field-l">Repeat</label><div class="seg mini" id="f-rep">' + REPEATS.map(([v, l]) => '<button class="' + (rep === v ? "on" : "") + '" data-v="' + v + '">' + l + "</button>").join("") + "</div>" +
       (rep === "custom" ? '<div class="chips days" id="f-days">' + [1, 2, 3, 4, 5, 6, 7].map(d => '<button class="chip' + (f.repeat.days.includes(d) ? " on" : "") + '" data-v="' + d + '">' + M.WD[d] + "</button>").join("") + "</div>" : "") +
@@ -117,7 +121,21 @@ export function openTask(ctx, opts = {}) {
     const sg = $("#f-sug", box); if (sg) sg.onclick = () => { f.est = M.suggest(s, f.cat, f.est, fs).est; redraw(); };
     $$("#f-day [data-v]", box).forEach(b => b.onclick = () => { f.day = b.dataset.v || null; redraw(); });
     const dt = $("#f-date", box); if (dt) dt.onchange = () => { f.day = dt.value || null; redraw(); };
-    $$("#f-when [data-v]", box).forEach(b => b.onclick = () => { const v = b.dataset.v; if (v === "at") { f.at = f.at || "09:00"; f.part = null; } else { f.at = null; f.part = v === "anytime" ? null : v; } redraw(); });
+    $$("#f-when [data-v]", box).forEach(b => b.onclick = () => {
+      const v = b.dataset.v;
+      if (v === "at") { f.at = f.at || "09:00"; f.part = null; }
+      else if (v === "anytime") { f.at = null; f.part = null; }
+      else {
+        const cur = f.at == null ? M.spanOf(f.part) : [];
+        f.at = null;
+        if (!cur.length) f.part = v;                                   // first pick
+        else if (!cur.includes(v)) f.part = M.makeSpan(cur.concat(v));  // extend to cover it
+        else if (cur.length === 1) f.part = null;                       // tapping the only part again clears it
+        else if (v === cur[0] || v === cur[cur.length - 1]) f.part = M.makeSpan(cur.filter(x => x !== v)); // shorten from an end
+        else f.part = v;                                                // middle of a span: just that part
+      }
+      redraw();
+    });
     $$("#f-rep [data-v]", box).forEach(b => b.onclick = () => { const v = b.dataset.v; f.repeat = v === "none" ? null : { freq: v, days: v === "custom" ? (f.repeat && f.repeat.days.length ? f.repeat.days : [M.weekday(f.day || today)]) : [] }; redraw(); });
     $$("#f-days [data-v]", box).forEach(b => b.onclick = () => { const d = +b.dataset.v, ds = f.repeat.days; f.repeat.days = ds.includes(d) ? ds.filter(x => x !== d) : ds.concat(d).sort(); redraw(); });
     $$("#f-scope [data-v]", box).forEach(b => b.onclick = () => { scope = b.dataset.v; redraw(); });
@@ -177,7 +195,7 @@ export function openTask(ctx, opts = {}) {
 export function quickAdd(ctx, defaults = {}) {
   const s = store.get(), today = M.todayISO();
   const m = modal('<div class="qa"><div class="qa-in">' + icon("plus", 18) + '<input id="qa" placeholder="Add a task — try “gym 6pm 45m #health”" autocomplete="off" spellcheck="false"><kbd>↵</kbd></div>' +
-    '<div class="qa-prev" id="qa-prev"></div><div class="qa-f"><span class="small muted">Dates: today, tomorrow, mon… · time: 6pm, 18:30 · part: morning/afternoon/evening · length: 45m, 1h30m · #category · every day / weekdays / every mon wed · inbox</span>' +
+    '<div class="qa-prev" id="qa-prev"></div><div class="qa-f"><span class="small muted">Dates: today, tomorrow, mon… · time: 6pm, 18:30 · part: morning, evening, morning to afternoon, all day · length: 45m, 1h30m · #category · every day / weekdays / every mon wed · inbox</span>' +
     '<button class="btn sm ghost" id="qa-more">More options</button></div></div>', { cls: "qa-modal" });
   const inp = $("#qa", m.el), prev = $("#qa-prev", m.el);
   const parsed = () => {
@@ -192,7 +210,7 @@ export function quickAdd(ctx, defaults = {}) {
     const chips = [];
     chips.push('<span class="pv">' + icon("week", 13) + (p.day ? M.dayLabel(p.day, today) : "Inbox") + "</span>");
     if (p.at) chips.push('<span class="pv">' + icon("clock", 13) + M.clock(M.hm(p.at)) + "</span>");
-    else if (p.part) chips.push('<span class="pv">' + icon(p.part === "evening" ? "sunset" : "sunrise", 13) + p.part.charAt(0).toUpperCase() + p.part.slice(1) + "</span>");
+    else if (p.part) chips.push('<span class="pv">' + icon(p.part === "evening" ? "sunset" : "sunrise", 13) + esc(M.partLabel(p.part)) + "</span>");
     chips.push('<span class="pv">' + icon("clock", 13) + M.dur(p.est || M.DEFAULT_EST) + (p.est ? "" : " (default)") + "</span>");
     chips.push(p.cat ? catChip(s, p.cat) : p.newCat ? '<span class="pv">#' + esc(p.newCat) + " (new)</span>" : catChip(s, defaults.cat || "other"));
     if (p.repeat) chips.push('<span class="pv">' + icon("repeat", 13) + (p.repeat.freq === "daily" ? "Every day" : p.repeat.freq === "weekdays" ? "Weekdays" : p.repeat.days.map(d => M.WD[d]).join(", ")) + "</span>");
