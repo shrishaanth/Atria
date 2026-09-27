@@ -100,7 +100,8 @@ function listHTML(s, tasks, date, now, isToday) {
     const items = open.filter(t => M.sectionOf(t, s.settings) === key)
       .sort((a, b) => (a.at ? M.hm(a.at) : 1e4) - (b.at ? M.hm(b.at) : 1e4) || (a.order || 0) - (b.order || 0));
     if (key === "anytime" && !items.length) continue;
-    const need = items.reduce((x, t) => x + M.remaining(t, now), 0);
+    // a task spanning into later parts is listed under its first part, but its time isn't all charged to it
+    const need = items.filter(t => t.at || !M.isSpan(t.part)).reduce((x, t) => x + M.remaining(t, now), 0);
     const [a, b] = M.partRange(s.settings, key);
     const cap = key === "anytime" ? null : M.partCapacity(s, date, key, now);
     const over = cap != null && need > cap && (cap > 0 || need > 0);
@@ -119,7 +120,8 @@ function listHTML(s, tasks, date, now, isToday) {
 
 export function rowHTML(s, t, now = Date.now()) {
   const a = M.actualMin(t, now), est = t.est || M.DEFAULT_EST, run = M.isRunning(t);
-  const time = t.at ? '<span class="tm">' + icon("clock", 12) + M.clock(M.hm(t.at)) + "</span>" : "";
+  const time = t.at ? '<span class="tm">' + icon("clock", 12) + M.clock(M.hm(t.at)) + "</span>"
+    : M.isSpan(t.part) ? '<span class="tm">' + icon("sunrise", 12) + esc(M.partLabel(t.part)) + "</span>" : "";
   const len = a > 0.5 ? '<span class="' + (a > est ? "over" : "") + '"' + (run ? ' data-elapsed="' + t.id + '"' : "") + ">" + M.dur(a) + "</span> / " + M.dur(est) : M.dur(est);
   return '<div class="trow hued' + (t.done ? " done" : "") + (run ? " running" : "") + '" style="--h:' + catHue(s, t.cat) + '" data-id="' + t.id + '" draggable="true">' +
     '<button class="tick' + (t.done ? " on" : "") + '" data-act="toggle" aria-label="' + (t.done ? "Mark as not done" : "Mark as done") + '">' + icon("check", 14) + "</button>" +
